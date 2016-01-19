@@ -1,0 +1,63 @@
+#!/bin/bash
+
+set -e
+
+# This script requires that the TRAVIS_CACHE_REPO environment variable
+# is set in the .travis.yml file, and points to the location of the Travis
+# cache repository to be cloned and used. For example:
+# TRAVIS_CACHE_REPO="git@github.com:nimbis/travis-cache-public"
+
+TRAVIS_CACHE_DIR=./.travis-cache
+TRAVIS_SETUP=./.travis-setup
+
+# Absolute path for original clone of repository (so always easy to return to)
+SITE_DIR=$(pwd)
+
+#####
+# At various times, Travis needs to create new git objects, (commits
+# within the travis-cache repository, tags after deploying to
+# production).
+#
+# In order to do that, git insists that the user have a valid
+# name. So we need to put something in place.
+#
+# In lieu of any better information, I'll use my email address to take
+# responsibility for any actions performed by this script.
+#####
+
+configure_git_authorship() {
+    git config user.email "carl.worth+travis@nimbisservices.com"
+    git config user.name "${TRAVIS_REPO_SLUG} travis-init-script"
+}
+
+#####
+# Initialize our git-repository-based travis cache.
+#
+# This function must be called once before any other calls to
+# travis_cache functions.
+#####
+
+init_travis_cache() {
+    if [ ! -e ${TRAVIS_CACHE_DIR} ]; then
+       git clone ${TRAVIS_CACHE_REPO} ${TRAVIS_CACHE_DIR}
+    fi
+
+    if [ ! -e ${TRAVIS_SETUP} ]; then
+       git clone https://github.com/nimbis/travis-setup.git ${TRAVIS_SETUP}
+    fi
+
+    cd ${TRAVIS_CACHE_DIR}
+    # Switch to an absolute path for TRAVIS_CACHE_DIR for better reliability
+    TRAVIS_CACHE_DIR=$(pwd)
+
+    git pull --no-edit
+    git reset --hard origin/master
+
+    configure_git_authorship
+
+    cd ${SITE_DIR}
+}
+
+echo "travis_fold:start:init_travis_cache"
+init_travis_cache
+echo "travis_fold:end:init_travis_cache"
